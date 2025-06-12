@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"><html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MiniCubase</title>
+  <style>
+    body {
+      background: #1e1e1e;
+      color: #fff;
+      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    #toolbar {
+      padding: 15px;
+      background: linear-gradient(45deg, #2c3e50, #3498db);
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+    #timeline {
+      position: relative;
+      height: 300px;
+      background: linear-gradient(to bottom, #2d2d2d, #1a1a1a);
+      margin: 10px;
+      overflow-x: auto;
+      white-space: nowrap;
+      border-radius: 8px;
+      box-shadow: inset 0 0 15px rgba(0,0,0,0.3);
+    }
+    .track {
+      position: relative;
+      height: 80px;
+      border-bottom: 1px solid #444;
+      background: linear-gradient(to right, rgba(41,128,185,0.1), transparent);
+    }
+    .clip {
+      position: absolute;
+      height: 70px;
+      top: 5px;
+      background: linear-gradient(45deg, #4d90fe, #2ecc71);
+      cursor: move;
+      padding: 5px;
+      box-sizing: border-box;
+      color: #fff;
+      border-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .clip:hover {
+      background: linear-gradient(45deg, #5da0ff, #27ae60);
+      transform: scale(1.02);
+      transition: all 0.2s ease;
+    }
+    .audio-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    .volume-control, .pan-control, .pitch-control {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100px;
+      height: 6px;
+      border-radius: 3px;
+      outline: none;
+    }
+    .volume-control {
+      background: linear-gradient(90deg, #e74c3c, #f1c40f, #2ecc71);
+    }
+    .pan-control {
+      background: linear-gradient(90deg, #9b59b6, #3498db, #9b59b6);
+    }
+    .pitch-control {
+      background: linear-gradient(90deg, #e67e22, #f1c40f);
+    }
+    .volume-control::-webkit-slider-thumb,
+    .pan-control::-webkit-slider-thumb,
+    .pitch-control::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    .delete-track {
+      position: absolute;
+      right: -30px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: linear-gradient(45deg, #e74c3c, #c0392b);
+      border: none;
+      color: white;
+      width: 25px;
+      height: 25px;
+      border-radius: 50%;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .track:hover .delete-track {
+      opacity: 1;
+    }
+    #time-marker {
+      position: absolute;
+      width: 2px;
+      height: 100%;
+      background: linear-gradient(to bottom, #e74c3c, #c0392b);
+      pointer-events: none;
+      z-index: 1000;
+      box-shadow: 0 0 10px rgba(231, 76, 60, 0.5);
+    }
+    #controls {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+    button {
+      padding: 8px 15px;
+      border: none;
+      border-radius: 5px;
+      background: linear-gradient(45deg, #3498db, #2ecc71);
+      color: white;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.3s ease;
+    }
+    button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    }
+    #tempo {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 150px;
+      height: 6px;
+      background: linear-gradient(90deg, #9b59b6, #3498db);
+      border-radius: 3px;
+      outline: none;
+    }
+    #tempo::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    input[type="file"] {
+      background: linear-gradient(45deg, #34495e, #2c3e50);
+      padding: 8px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    label {
+      font-weight: bold;
+      color: #ecf0f1;
+    }
+    #record-monitor {
+      width: 150px;
+      height: 40px;
+      background: #2c3e50;
+      border-radius: 5px;
+      margin-left: 15px;
+      position: relative;
+      overflow: hidden;
+    }
+    #record-visualizer {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(45deg, #e74c3c, #c0392b);
+      transform-origin: bottom;
+      transform: scaleY(0);
+    }
+  </style>
+</head>
+<body>
+
+<div id="toolbar">
+  <div id="controls">
+    <button id="play" title="Play">Play ▶</button>
+    <button id="stop" title="Stop">Stop ⬛</button>
+    <button id="record" title="Record">Record 🔴</button>
+    <label for="tempo">Tempo:</label>
+    <input type="range" id="tempo" min="0.5" max="2" step="0.1" value="1" title="Adjust playback speed">
+    <span>Tempo: <span id="tempo-value">1x</span></span>
+    <div id="record-monitor"><div id="record-visualizer"></div></div>
+  </div>
+  <label for="import">Import Audio Files:
+    <input type="file" id="import" accept="audio/*" multiple placeholder="Choose audio files" title="Import audio files">
+  </label>
+</div>
+
+<div id="timeline">
+  <div id="time-marker"></div>
+</div>
+
+<script>
+(async () => {
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AudioContext();
+  const timeline = document.getElementById('timeline');
+  const timeMarker = document.getElementById('time-marker');
+  const tracks = [];
+  let isPlaying = false;
+  let startTime = 0;
+  let animationFrame;
+
+  document.getElementById('import').addEventListener('change', async e => {
+    for (const file of e.target.files) {
+      const data = await file.arrayBuffer();
+      const buffer = await ctx.decodeAudioData(data);
+      addTrack(buffer, file.name);
+    }
+  });
+
+  function addTrack(buffer, name) {
+    const tr = document.createElement('div');
+    tr.className = 'track';
+    timeline.appendChild(tr);
+
+    const clip = document.createElement('div');
+    clip.className = 'clip';
+    clip.style.width = (buffer.duration * 100) + 'px';
+    clip.style.left = '0px';
+    clip.textContent = name;
+
+    const controls = document.createElement('div');
+    controls.className = 'audio-controls';
+
+    const volumeControl = document.createElement('input');
+    volumeControl.type = 'range';
+    volumeControl.className = 'volume-control';
+    volumeControl.min = 0;
+    volumeControl.max = 1;
+    volumeControl.step = 0.1;
+    volumeControl.value = 1;
+    volumeControl.title = 'Volume';
+
+    const panControl = document.createElement('input');
+    panControl.type = 'range';
+    panControl.className = 'pan-control';
+    panControl.min = -1;
+    panControl.max = 1;
+    panControl.step = 0.1;
+    panControl.value = 0;
+    panControl.title = 'Pan';
+
+    const pitchControl = document.createElement('input');
+    pitchControl.type = 'range';
+    pitchControl.className = 'pitch-control';
+    pitchControl.min = 0.5;
+    pitchControl.max = 2;
+    pitchControl.step = 0.1;
+    pitchControl.value = 1;
+    pitchControl.title = 'Pitch';
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'delete-track';
+    deleteBtn.innerHTML = '×';
+    deleteBtn.title = 'Delete track';
+    deleteBtn.onclick = () => {
+      tr.remove();
+      tracks.splice(tracks.findIndex(t => t.clip === clip), 1);
+    };
+
+    controls.appendChild(volumeControl);
+    controls.appendChild(panControl);
+    controls.appendChild(pitchControl);
+    tr.appendChild(clip);
+    clip.appendChild(controls);
+    tr.appendChild(deleteBtn);
+    makeDraggable(clip);
+
+    const gainNode = ctx.createGain();
+    const panNode = ctx.createStereoPanner();
+    
+    volumeControl.addEventListener('input', () => {
+      gainNode.gain.value = volumeControl.value;
+    });
+
+    panControl.addEventListener('input', () => {
+      panNode.pan.value = panControl.value;
+    });
+
+    tracks.push({ buffer, clip, gainNode, panNode, pitchControl });
+  }
+
+  function makeDraggable(elem) {
+    let offsetX = 0;
+    let dragging = false;
+
+    elem.addEventListener('mousedown', e => {
+      if (e.target.type === 'range') return;
+      dragging = true;
+      offsetX = e.offsetX;
+    });
+
+    window.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      const x = e.clientX - timeline.getBoundingClientRect().left - offsetX;
+      elem.style.left = Math.max(0, x) + 'px';
+    });
+
+    window.addEventListener('mouseup', () => {
+      dragging = false;
+    });
+  }
+
+  let sched = [];
+
+  function updateTimeMarker() {
+    if (!isPlaying) return;
+    const elapsed = ctx.currentTime - startTime;
+    timeMarker.style.left = (elapsed * 100) + 'px';
+    animationFrame = requestAnimationFrame(updateTimeMarker);
+  }
+
+  const tempoControl = document.getElementById('tempo');
+  const tempoValue = document.getElementById('tempo-value');
+  
+  tempoControl.addEventListener('input', () => {
+    tempoValue.textContent = tempoControl.value + 'x';
+  });
+
+  document.getElementById('play').onclick = () => {
+    ctx.resume();
+    sched = [];
+    isPlaying = true;
+    startTime = ctx.currentTime;
+
+    tracks.forEach(({ buffer, clip, gainNode, panNode, pitchControl }) => {
+      const start = parseFloat(clip.style.left || '0') / 100;
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      src.playbackRate.value = parseFloat(tempoControl.value) * parseFloat(pitchControl.value);
+      src.connect(gainNode);
+      gainNode.connect(panNode);
+      panNode.connect(ctx.destination);
+      src.start(ctx.currentTime + start);
+      sched.push(src);
+    });
+
+    updateTimeMarker();
+  };
+
+  document.getElementById('stop').onclick = () => {
+    isPlaying = false;
+    cancelAnimationFrame(animationFrame);
+    timeMarker.style.left = '0px';
+    sched.forEach(source => {
+      try { source.stop(); } catch {}
+    });
+    sched = [];
+  };
+
+  let mediaRecorder;
+  const recordButton = document.getElementById('record');
+  const visualizer = document.getElementById('record-visualizer');
+  
+  recordButton.onclick = async () => {
+    if (!mediaRecorder) {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      
+      const audioContext = new AudioContext();
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyzer = audioContext.createAnalyser();
+      analyzer.fftSize = 256;
+      source.connect(analyzer);
+      
+      function visualize() {
+        if (mediaRecorder.state === 'recording') {
+          const dataArray = new Uint8Array(analyzer.frequencyBinCount);
+          analyzer.getByteFrequencyData(dataArray);
+          const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+          visualizer.style.transform = `scaleY(${average / 128})`;
+          requestAnimationFrame(visualize);
+        }
+      }
+      
+      mediaRecorder.ondataavailable = async (e) => {
+        const buffer = await ctx.decodeAudioData(await e.data.arrayBuffer());
+        addTrack(buffer, 'Recording ' + new Date().toLocaleTimeString());
+      };
+    }
+
+    if (mediaRecorder.state === 'inactive') {
+      mediaRecorder.start();
+      recordButton.style.background = 'linear-gradient(45deg, #e74c3c, #c0392b)';
+      visualize();
+    } else {
+      mediaRecorder.stop();
+      recordButton.style.background = 'linear-gradient(45deg, #3498db, #2ecc71)';
+      visualizer.style.transform = 'scaleY(0)';
+    }
+  };
+})();
+</script>
+</body>
+</html>
